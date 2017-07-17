@@ -17,22 +17,23 @@ import java.util.Map;
  * Created by seijuro
  */
 public class HBaseHelper {
-    private static final Log LOG = LogFactory.getLog(HBaseHelper.class);
-
     private final Configuration config;
     private final User user;
+    private final Connection conn;
 
     /**
      * C'tor
      *
      * @param $config
      */
-    public HBaseHelper(Configuration $config, User user) {
+    public HBaseHelper(Configuration $config, User user) throws IOException {
         this.config = $config;
         this.user = user;
+
+        this.conn = ConnectionFactory.createConnection(this.config);
     }
 
-    public HBaseHelper(Configuration $config) {
+    public HBaseHelper(Configuration $config) throws IOException {
         this($config, null);
     }
 
