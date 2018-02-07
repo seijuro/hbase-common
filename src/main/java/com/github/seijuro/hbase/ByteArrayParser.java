@@ -93,6 +93,16 @@ public class ByteArrayParser {
     }
 
     /**
+     * convert short value to byte[]
+     *
+     * @param value
+     * @return
+     */
+    public static byte[] parseByteArray(short value) {
+        return ByteBuffer.allocate(Short.BYTES).putShort(value).array();
+    }
+
+    /**
      * convert long value to byte[]
      *
      * @param value
@@ -100,16 +110,6 @@ public class ByteArrayParser {
      */
     public static byte[] parseByteArray(long value) {
         return ByteBuffer.allocate(Long.BYTES).putLong(value).array();
-    }
-
-    /**
-     * convert short value to byte[]
-     *
-     * @param value
-     * @return
-     */
-    public static byte[] parseByteArray(short value) {
-        return ByteBuffer.allocate(Short.BYTES).putLong(value).array();
     }
 
     /**
