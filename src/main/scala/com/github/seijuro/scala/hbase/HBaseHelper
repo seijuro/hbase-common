@@ -1,0 +1,43 @@
+package com.github.seijuro.scala.hbase
+
+
+import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.util.Bytes
+import collection.mutable.Map
+
+import scala.collection.JavaConversions._
+
+object HBaseHelper(val tabname: String = "keyword", val cfname: String = "cf") {
+  def increment(table: Table, row: String, values: Seq[(String, Long)]) = {
+    val incr: Increment = new Increment(Bytes.toBytes(row))
+
+    for (value <- values) yield incr.addColumn(Bytes.toBytes(value._1), Bytes.toBytes(columnFamily), value._2)
+
+    val ret = table.increment(incr)
+  }
+
+  def getDailyKeywordCount(conn: Connection, tablename: String, row: String): Map[String, collection.mutable.Map[String, Long]] = {
+    val table: Table = conn.getTable(TableName.valueOf(tablename))
+    val get = new Get(Bytes.toBytes(row))
+    val result = table.get(get)
+
+    val rentry = Map[String, Long]()
+    val ret = Map[String, collection.mutable.Map[String, Long]]()
+
+    for (entry <- result.getMap.entrySet) {
+      val cf = entry.getKey
+
+      for (rr <- entry.getValue.entrySet) {
+        val qf = rr.getKey
+        val count = Bytes.toLong(result.getValue(cf, qf))
+
+        rentry.put(Bytes.toString(qf), count)
+      }
+
+      ret.put(Bytes.toString(cf), rentry)
+    }
+
+    ret
+  }
+}

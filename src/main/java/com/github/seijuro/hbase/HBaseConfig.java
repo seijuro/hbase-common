@@ -1,12 +1,14 @@
 package com.github.seijuro.hbase;
 
+import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 
@@ -14,40 +16,91 @@ import java.util.Properties;
  * Created by seijuro
  */
 public class HBaseConfig {
-    static final int WELKNOWN_PORT_MAX = 1024;
-    static final int PORT_MAX = 65536;
+    /**
+     * Class Properties
+     */
+    private static final Logger LOG = LoggerFactory.getLogger(HBaseConfig.class);
 
-    public static class Property {
-        public static final String ZOOKEEPER_QUORUM = "hbase.zookeeper.quorum";
-        public static final String ZOOKEEPER_CLIENTPORT = "hbase.zookeeper.property.clientPort";
-        public static final String ZOOKEEPER_ZNODE_PARENT = "zookeeper.znode.parent";
+    private static final int WELKNOWN_PORT_MAX = 1024;
+    private static final int PORT_MAX = 65536;
 
-        public static final String CLUSTER_DISTRIBUTED = "hbase.cluster.distributed";
+    /**
+     * designed for hbase configuration properties.
+     */
+    public enum Property {
+        ZOOKEEPER_QUORUM("hbase.zookeeper.quorum"),
+        ZOOKEEPER_CLIENTPORT("hbase.zookeeper.property.clientPort"),
+        ZOOKEEPER_ZNODE_PARENT("zookeeper.znode.parent"),
+        CLUSTER_DISTRIBUTED("hbase.cluster.distributed");
+
+        /**
+         * Instance properties
+         */
+        @Getter
+        private final String property;
+
+        /**
+         * C'tor
+         *
+         * @param $property
+         */
+        Property(String $property) {
+            this.property = $property;
+        }
+    }
+
+    /**
+     * Instance Properties
+     */
+    private final Properties props;
+
+    /**
+     * C'tor
+     * @param builder
+     */
+    HBaseConfig(Builder builder) {
+        this.props = builder.props;
+    }
+
+    /**
+     * get value for the given property whose key is equal to.
+     *
+     * @param property
+     * @return
+     */
+    public Object getProperty(Property property) {
+        if (Objects.nonNull(property)) {
+            return this.props.getProperty(property.getProperty());
+        }
+
+        return null;
+    }
+
+    public String getZKQuorum() {
+        return (String)getProperty(Property.ZOOKEEPER_QUORUM);
+    }
+
+    public Integer getClientPort() {
+        return (Integer)getProperty(Property.ZOOKEEPER_CLIENTPORT);
+    }
+
+    public Boolean isClusterDisributed() {
+        return (Boolean)getProperty(Property.CLUSTER_DISTRIBUTED);
+    }
+
+    public Configuration create() {
+        Configuration configuration = HBaseConfiguration.create();
+        for (Map.Entry<Object, Object> entry : this.props.entrySet()) {
+            configuration.set(String.class.cast(entry.getKey()), entry.getValue().toString());
+        }
+
+        return configuration;
     }
 
     /**
      * Builder pattern class
      */
     public static class Builder {
-        /**
-         * laoding configuration from file at filepath.
-         *
-         * @param filepath
-         * @return
-         * @throws FileNotFoundException
-         * @throws IOException
-         */
-        public static HBaseConfig from(String filepath) throws IOException {
-            FileInputStream fis = new FileInputStream(filepath);
-            Properties prop = new Properties();
-
-            prop.load(fis);
-
-            fis.close();
-
-            return new HBaseConfig(prop);
-        }
-
         /**
          * Instance Properties
          */
@@ -60,35 +113,71 @@ public class HBaseConfig {
             this.props = new Properties();
         }
 
-        public Builder setProperty(String property, String value) {
-            assert (value != null && value.length() > 0);
+        public Builder setProperty(Property property, String value) {
+            assert Objects.nonNull(value);
 
-            this.props.setProperty(property, value);
+            if (Objects.isNull(value)) {
+                this.props.remove(property.getProperty());
+            }
+            else {
+                this.props.setProperty(property.getProperty(), value);
+            }
+
             return this;
         }
 
+        /**
+         * set property, quorum.
+         *
+         * @param quorum
+         * @return
+         */
         public Builder setQuorum(String quorum) {
-            this.props.put(Property.ZOOKEEPER_QUORUM, quorum);
-            return this;
+            return setProperty(Property.ZOOKEEPER_QUORUM, quorum);
         }
 
-        public Builder setClientPort(int port) {
-            assert (port > WELKNOWN_PORT_MAX && port <= PORT_MAX);
+        /**
+         * set property, client port.
+         *
+         * @param port
+         * @return
+         */
+        public Builder setClientPort(int port) throws IllegalArgumentException {
+            //  checking argument(s)
+            if (port <= WELKNOWN_PORT_MAX ||
+                    port > PORT_MAX) {
+                String msg = String.format("Parameter, port (%d), must be a value within a range (%d, %d].", port, WELKNOWN_PORT_MAX, PORT_MAX);
 
-            this.props.setProperty(Property.ZOOKEEPER_CLIENTPORT, Integer.toString(port));
-            return this;
+                LOG.warn("Checking argument failed ... (reason : {})", msg);
+
+                throw new IllegalArgumentException(msg);
+            }
+
+            return setProperty(Property.ZOOKEEPER_CLIENTPORT, Integer.toString(port));
         }
 
+        /**
+         * set property, znode parent.
+         *
+         * @param parent
+         * @return
+         */
         public Builder setZNodeParent(String parent) {
-            assert (parent != null && parent.length() > 0);
+            if (StringUtils.isEmpty(parent)) {
+                return setProperty(Property.ZOOKEEPER_ZNODE_PARENT, null);
+            }
 
-            this.props.setProperty(Property.ZOOKEEPER_ZNODE_PARENT, parent);
-            return this;
+            return setProperty(Property.ZOOKEEPER_ZNODE_PARENT, parent);
         }
 
+        /**
+         * set property, distributed cluster.
+         *
+         * @param flag
+         * @return
+         */
         public Builder setDistributedCluster(boolean flag) {
-            this.props.setProperty(Property.CLUSTER_DISTRIBUTED, Boolean.toString(flag));
-            return this;
+            return setProperty(Property.CLUSTER_DISTRIBUTED, Boolean.toString(flag));
         }
 
         /**
@@ -99,66 +188,5 @@ public class HBaseConfig {
         public HBaseConfig build() {
             return new HBaseConfig(this);
         }
-    }
-
-    /**
-     * Instance Properties
-     */
-    private final Properties props;
-
-    /**
-     * C'tor
-     *
-     * @param properties
-     */
-    HBaseConfig(Properties properties) {
-        this.props = properties;
-    }
-
-    /**
-     * C'tor
-     * @param builder
-     */
-    HBaseConfig(Builder builder) {
-        this.props = builder.props;
-    }
-
-    public String getProperty(String property) {
-        assert (property != null);
-
-        return this.props.getProperty(property);
-    }
-
-    public String getZKQuorum() {
-        return this.props.getProperty(Property.ZOOKEEPER_QUORUM);
-    }
-
-    public int getClientPort() throws NullPointerException, NumberFormatException {
-        String port = this.props.getProperty(Property.ZOOKEEPER_CLIENTPORT);
-
-        if (port == null) {
-            throw new NullPointerException(String.format("property, %s, isn't set.", Property.ZOOKEEPER_CLIENTPORT));
-        }
-
-        return Integer.parseInt(port);
-    }
-
-    public boolean isClusterDisributed() {
-        String flag = this.props.getProperty(Property.CLUSTER_DISTRIBUTED);
-
-        if (flag == null) {
-            throw new NullPointerException(String.format("Property, %s, isn't set", Property.CLUSTER_DISTRIBUTED));
-        }
-
-        return Boolean.parseBoolean(flag);
-    }
-
-    public Configuration create() {
-        Configuration configuration = HBaseConfiguration.create();
-        for (Map.Entry<Object, Object> entry : this.props.entrySet()) {
-            configuration.set(String.class.cast(entry.getKey()), String.class.cast(entry.getValue()));
-        }
-
-        return configuration;
     }
 }
