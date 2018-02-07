@@ -1,6 +1,5 @@
 package com.github.seijuro.hbase;
 
-import io.netty.buffer.ByteBuf;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Result;

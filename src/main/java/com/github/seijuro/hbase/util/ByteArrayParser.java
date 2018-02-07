@@ -1,4 +1,4 @@
-package com.github.seijuro.hbase;
+package com.github.seijuro.hbase.util;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;

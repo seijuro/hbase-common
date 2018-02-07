@@ -1,5 +1,6 @@
-package com.github.seijuro.hbase;
+package com.github.seijuro.hbase.util;
 
+import com.github.seijuro.hbase.util.ByteArrayParser;
 import org.junit.Assert;
 import org.junit.Test;
 
