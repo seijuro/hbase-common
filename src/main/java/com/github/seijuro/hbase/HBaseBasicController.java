@@ -612,7 +612,7 @@ public class HBaseBasicController {
 
     /**
      * create <code>Scan</code> instance.
-     * 
+     *
      * @param startRow
      * @param stopRow
      * @param columns
