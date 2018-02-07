@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
+import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.security.User;
 import org.slf4j.Logger;
@@ -611,6 +612,23 @@ public class HBaseBasicController {
 
     /**
      * create <code>Scan</code> instance.
+     * 
+     * @param startRow
+     * @param stopRow
+     * @param columns
+     * @param filterList
+     * @return
+     */
+    protected Scan createScan(byte[] startRow, byte[] stopRow, List<HBaseColumn> columns, FilterList filterList) {
+        Scan scan = createScan(startRow, stopRow, columns);
+
+        if (Objects.nonNull(filterList)) {  scan.setFilter(filterList); }
+
+        return scan;
+    }
+
+    /**
+     * create <code>Scan</code> instance.
      *
      * @param startRow
      * @param stopRow
@@ -642,6 +660,23 @@ public class HBaseBasicController {
                 }
             }
         }
+
+        return scan;
+    }
+
+    /**
+     * create <code>Scan</code> instance.
+     *
+     * @param startRow
+     * @param stopRow
+     * @param families
+     * @param columns
+     * @param filterList
+     * @return
+     */
+    protected Scan createScan(byte[] startRow, byte[] stopRow, byte[][] families, byte[][] columns, FilterList filterList) {
+        Scan scan = createScan(startRow, stopRow, families, columns);
+        if (Objects.nonNull(filterList)) {  scan.setFilter(filterList); }
 
         return scan;
     }
