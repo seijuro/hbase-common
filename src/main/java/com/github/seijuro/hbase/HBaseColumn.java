@@ -1,72 +1,61 @@
 package com.github.seijuro.hbase;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 import org.apache.hadoop.hbase.util.Bytes;
 
-/**
- * Created by myungjoonlee on 2017. 7. 13..
- */
-public class HBaseColumn {
+import java.util.ArrayList;
+import java.util.List;
+
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class HBaseColumn extends HBaseColumnFamily {
+    public static List<HBaseColumn> asList(byte[][] families, byte[][] columns) {
+        List<HBaseColumn> results = new ArrayList<>();
+
+        for (int index = 0; index != families.length; ++index) {
+            results.add(new HBaseColumn(families[index], columns[index]));
+        }
+
+        return results;
+    }
+
     /**
      * Instance Properties
      */
     @Getter
-    private final String family;
-    @Getter
-    private final String qualifier;
+    private final String qualifierName;
 
     /**
      * C'tor
      *
-     * @param f
-     * @param q
+     * @param $family
+     * @param $qualifier
      */
-    public HBaseColumn(String f, String q) {
-        this.family = f;
-        this.qualifier = q;
+    public HBaseColumn(String $family, String $qualifier) {
+        super($family);
+
+        this.qualifierName = $qualifier;
     }
 
     /**
-     * return column family as bytes array
-     * @return
+     * C'tor
+     *
+     * @param $family
+     * @param $qualifier
      */
-    public byte[] familtyBytes() {
-        return Bytes.toBytes(this.family);
+    public HBaseColumn(byte[] $family, byte[] $qualifier) {
+        super($family);
+
+        this.qualifierName = Bytes.toString($qualifier);
     }
 
     /**
      * return column qualifier as bytes array
      * @return
      */
-    public byte[] qualifierBytes() {
-        return Bytes.toBytes(this.qualifier);
-    }
-
-    /**
-     * override hashCode to use <code>HBaseColumn</code> instance with some datat structure(s), such as <code>HaspMap</code>.
-     *
-     * @return
-     */
-    @Override
-    public int hashCode() {
-        int hash = 17;
-
-        return (family.hashCode() * hash) << 31 + this.qualifier.hashCode();
-    }
-
-    /**
-     * return true, if it's properties has same values with rhs's properties.
-     * override equals to use <code>HBaseColumn</code> instance with some datat structure(s), such as <code>HaspMap</code>.
-     *
-     * @return
-     */
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof HBaseColumn) {
-            HBaseColumn rhs = (HBaseColumn)obj;
-            return this.family.equals(rhs.family) && this.qualifier.equals(rhs.qualifier);
-        }
-
-        return false;
+    public byte[] toBytesQualifier() {
+        return Bytes.toBytes(this.qualifierName);
     }
 }

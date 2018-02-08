@@ -3,11 +3,11 @@ package com.github.seijuro.hbase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 
 public class HbaseBasicControllerTest {
@@ -55,7 +55,6 @@ public class HbaseBasicControllerTest {
             Column2_2 = "column5";
             Column2_3 = "column6";
 
-
             RowKey = "TEST:CTRL:0001";
 
             ColumnValue1_1 = "column.11.value";
@@ -71,9 +70,9 @@ public class HbaseBasicControllerTest {
     @Test
     public void testInstantiation() {
         HBaseConfig config = new HBaseConfig.Builder()
-                .setQuorum("kdfsname01,kdfsname02,kdfs01,kdfs02")
+                .setQuorum(Sample.ZKQuorum)
                 .setDistributedCluster(true)
-                .setZNodeParent("/hbase")
+                .setZNodeParent(Sample.ZKParent)
                 .build();
 
         Configuration hbaseConfig = config.create();
@@ -224,35 +223,33 @@ public class HbaseBasicControllerTest {
                 }
 
                 byte[][] families = new byte[][] {
-                        Sample.ColumnFamily1.getBytes(),
-                        Sample.ColumnFamily1.getBytes(),
-                        Sample.ColumnFamily1.getBytes(),
-                        Sample.ColumnFamily2.getBytes(),
-                        Sample.ColumnFamily2.getBytes(),
-                        Sample.ColumnFamily2.getBytes()};
+                        Bytes.toBytes(Sample.ColumnFamily1),
+                        Bytes.toBytes(Sample.ColumnFamily1),
+                        Bytes.toBytes(Sample.ColumnFamily1),
+                        Bytes.toBytes(Sample.ColumnFamily2),
+                        Bytes.toBytes(Sample.ColumnFamily2),
+                        Bytes.toBytes(Sample.ColumnFamily2)};
                 byte[][] columns = new byte[][] {
-                        Sample.Column1_1.getBytes(),
-                        Sample.Column1_2.getBytes(),
-                        Sample.Column1_3.getBytes(),
-                        Sample.Column2_1.getBytes(),
-                        Sample.Column2_2.getBytes(),
-                        Sample.Column2_3.getBytes()};
+                        Bytes.toBytes(Sample.Column1_1),
+                        Bytes.toBytes(Sample.Column1_2),
+                        Bytes.toBytes(Sample.Column1_3),
+                        Bytes.toBytes(Sample.Column2_1),
+                        Bytes.toBytes(Sample.Column2_2),
+                        Bytes.toBytes(Sample.Column2_3)};
                 byte[][] values = new byte[][] {
-                        Sample.ColumnValue1_1.getBytes(),
-                        Sample.ColumnValue1_2.getBytes(),
-                        Sample.ColumnValue1_3.getBytes(),
-                        ByteBuffer.allocate(4).putInt(Sample.ColumnValue2_1).array(),
-                        ByteBuffer.allocate(4).putInt(Sample.ColumnValue2_2).array(),
-                        ByteBuffer.allocate(4).putInt(Sample.ColumnValue2_3).array()};
+                        Bytes.toBytes(Sample.ColumnValue1_1),
+                        Bytes.toBytes(Sample.ColumnValue1_2),
+                        Bytes.toBytes(Sample.ColumnValue1_3),
+                        Bytes.toBytes(Sample.ColumnValue2_1),
+                        Bytes.toBytes(Sample.ColumnValue2_2),
+                        Bytes.toBytes(Sample.ColumnValue2_3)};
 
-                controller.put(Sample.Tablename, Sample.RowKey.getBytes(), families, columns, values);
+                controller.put(controller.getTable(Sample.Tablename), Sample.RowKey.getBytes(), families, columns, values);
 
                 //  scan
                 {
-                    List<Result> results = controller.scan(
-                            Sample.Tablename,
-                            new byte[][]{Sample.ColumnFamily1.getBytes(), Sample.ColumnFamily1.getBytes(), Sample.ColumnFamily1.getBytes(), Sample.ColumnFamily2.getBytes(), Sample.ColumnFamily2.getBytes(), Sample.ColumnFamily2.getBytes()},
-                            new byte[][]{Sample.Column1_1.getBytes(), Sample.Column1_2.getBytes(), Sample.Column1_3.getBytes(), Sample.Column2_1.getBytes(), Sample.Column2_2.getBytes(), Sample.Column2_3.getBytes()});
+                    List<HBaseColumn> hbaseColumns = HBaseColumn.asList(families, columns);
+                    List<Result> results = controller.scan(controller.getTable(Sample.Tablename), hbaseColumns, null);
 
                     Assert.assertNotNull(results);
 
@@ -263,9 +260,9 @@ public class HbaseBasicControllerTest {
                         String strRowKey = new String(rowKey, "UTF-8");
 
                         if (strRowKey.equals(Sample.RowKey)) {
-                            String value1 = new String(result.getValue(Sample.ColumnFamily1.getBytes(), Sample.Column1_1.getBytes()), "UTF-8");
-                            String value2 = new String(result.getValue(Sample.ColumnFamily1.getBytes(), Sample.Column1_2.getBytes()), "UTF-8");
-                            String value3 = new String(result.getValue(Sample.ColumnFamily1.getBytes(), Sample.Column1_3.getBytes()), "UTF-8");
+                            String value1 = Bytes.toString(result.getValue(Bytes.toBytes(Sample.ColumnFamily1), Bytes.toBytes(Sample.Column1_1)));
+                            String value2 = Bytes.toString(result.getValue(Bytes.toBytes(Sample.ColumnFamily1), Bytes.toBytes(Sample.Column1_2)));
+                            String value3 = Bytes.toString(result.getValue(Bytes.toBytes(Sample.ColumnFamily1), Bytes.toBytes(Sample.Column1_3)));
 
                             System.out.printf("Checking 'column1' ... (ref : %s, result : %s).\n", Sample.ColumnValue1_1, value1);
                             Assert.assertEquals(Sample.ColumnValue1_1, value1);
@@ -303,12 +300,12 @@ public class HbaseBasicControllerTest {
                     Assert.assertNotNull(String.format("It must be not null (column := {family : %s, qualifier : %s}", Sample.ColumnFamily1, Sample.Column1_2), value2);
                     Assert.assertNotNull(String.format("It must be not null (column := {family : %s, qualifier : %s}", Sample.ColumnFamily1, Sample.Column1_3), value3);
 
-                    String columnValue1 = new String(value1, "UTF-8");
-                    String columnValue2 = new String(value2, "UTF-8");
-                    String columnValue3 = new String(value3, "UTF-8");
-                    int columnValue4 = ByteBuffer.wrap(value4).getInt();
-                    int columnValue5 = ByteBuffer.wrap(value5).getInt();
-                    int columnValue6 = ByteBuffer.wrap(value6).getInt();
+                    String columnValue1 = Bytes.toString(value1);
+                    String columnValue2 = Bytes.toString(value2);
+                    String columnValue3 = Bytes.toString(value3);
+                    int columnValue4 = Bytes.toInt(value4);
+                    int columnValue5 = Bytes.toInt(value5);
+                    int columnValue6 = Bytes.toInt(value6);
 
                     //  check if the result values are equal to the original values
                     Assert.assertEquals(Sample.ColumnValue1_1, columnValue1);

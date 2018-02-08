@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
+import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.security.User;
@@ -345,31 +346,8 @@ public class HBaseBasicController {
         }
     }
 
-
     /**
-     * put row into table whose name is tablename.
      *
-     * @param tablename
-     * @param rowKey
-     * @param families
-     * @param columns
-     * @param values
-     * @throws IOException
-     * @throws IllegalArgumentException
-     */
-    public void put(String tablename, byte[] rowKey, byte[][] families, byte[][] columns, byte[][] values) throws IOException, IllegalArgumentException {
-        Table table = getTable(tablename);
-
-        try {
-            put(table, rowKey, families, columns, values);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * put row into table whose name is tablename.
      *
      * @param table
      * @param rowKey
@@ -432,47 +410,7 @@ public class HBaseBasicController {
     }
 
     /**
-     * put all rows with given list of rowKeys and columnValues.
-     *
-     * @param tablename
-     * @param records
-     * @throws IOException
-     */
-    public void put(String tablename, Map<byte[], List<HbaseColumnValue>> records) throws IOException, IllegalArgumentException {
-        Table table = getTable(tablename);
-
-        try {
-            for (Map.Entry<byte[], List<HbaseColumnValue>> entry : records.entrySet()) {
-                put(table, entry.getKey(), entry.getValue());
-            }
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * put one row with given rowKey and columnValues.
-     *
-     * @param tablename
-     * @param rowKey
-     * @param columnValues
-     * @throws IOException
-     * @throws IllegalArgumentException
-     */
-    public void put(String tablename, byte[] rowKey, List<HbaseColumnValue> columnValues) throws IOException, IllegalArgumentException {
-        Table table = getTable(tablename);
-
-        try {
-            put(table, rowKey, columnValues);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * put row with given rowKey and values.
+     * put row
      *
      * @param table
      * @param rowKey
@@ -515,46 +453,14 @@ public class HBaseBasicController {
             HBaseColumn column = columnValue.getColumn();
             byte[] value = columnValue.getValue();
 
-            put.addColumn(column.familtyBytes(), column.qualifierBytes(), value);
+            put.addColumn(column.toBytesFamily(), column.toBytesQualifier(), value);
         }
 
         table.put(put);
     }
 
     /**
-     * retrieve row whose row key is rowKey.
-     *
-     * @param tablename
-     * @param rowKey
-     * @return
-     * @throws IOException
-     */
-    public Result get(String tablename, byte[] rowKey) throws IOException {
-        return get(tablename, rowKey, DefaultMaxVersion);
-    }
-
-    /**
-     * retrieve row whose row key is rowKey.
-     *
-     * @param tablename
-     * @param rowKey
-     * @param maxVersion
-     * @return
-     * @throws IOException
-     */
-    public Result get(String tablename, byte[] rowKey, int maxVersion) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return get(table, rowKey, maxVersion);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * get row whose row key is equal to rowKey.
+     * retrieve row whose key is {@param rowKey}
      *
      * @param table
      * @param rowKey
@@ -584,6 +490,8 @@ public class HBaseBasicController {
         }
 
         Get get = new Get(rowKey);
+        get.setMaxVersions(maxVersion);
+        
         Result result = table.get(get);
 
         LOG.debug("result (rowkey : {}) : {}", rowKey, result);
@@ -592,46 +500,29 @@ public class HBaseBasicController {
     }
 
     /**
-     * create <code>Scan</code> instance.
+     * retrieve row whose key is {@param rowKey}
      *
-     * @param startRow
-     * @param stopRow
-     * @param columns
-     * @param filterList
+     * @param table
+     * @param rowKey
      * @return
+     * @throws IOException
      */
-    protected Scan createScan(byte[] startRow, byte[] stopRow, List<HBaseColumn> columns, FilterList filterList) {
-        Scan scan;
-
-        if (Objects.isNull(startRow) ||
-                startRow.length == 0) {
-            scan = new Scan();
-        }
-        else if (Objects.isNull(stopRow) ||
-                stopRow.length == 0) {
-            scan = new Scan(startRow);
-        }
-        else {
-            scan = new Scan(startRow, stopRow);
-        }
-
-        for (HBaseColumn column : columns) {
-            scan.addColumn(column.getFamily().getBytes(), column.getQualifier().getBytes());
-        }
-
-        if (Objects.nonNull(filterList)) {  scan.setFilter(filterList); }
-
-        return scan;
+    public Result get(Table table, byte[] rowKey) throws IOException {
+        return get(table, rowKey, DefaultMaxVersion);
     }
 
     /**
-     * create <code>Scan</code> instance.
+     * create {@link Scan} instance.
+     * You can get {@link Scan} instance to retrieve rows which ragge between {@param startRow} and {@param stopRow} by specifing these parameter(s).
+     * If you didn't set, return {@link Scan} instance to retrieve all rows.
      *
      * @param startRow
      * @param stopRow
+     * @param familyOrColumns
+     * @param filter
      * @return
      */
-    protected Scan createScan(byte[] startRow, byte[] stopRow, byte[][] families, byte[][] columns, FilterList filterList) {
+    public <T extends HBaseColumnFamily> Scan createScan(byte[] startRow, byte[] stopRow, List<T> familyOrColumns, Filter filter) {
         Scan scan;
 
         if (Objects.isNull(startRow) ||
@@ -646,48 +537,39 @@ public class HBaseBasicController {
             scan = new Scan(startRow, stopRow);
         }
 
-        if (Objects.nonNull(filterList)) {  scan.setFilter(filterList); }
+        for (T familyOrColumn : familyOrColumns) {
+            if (familyOrColumn instanceof HBaseColumn) {
+                HBaseColumn column = HBaseColumn.class.cast(familyOrColumn);
 
-        if (Objects.nonNull(families) &&
-                Objects.nonNull(columns)) {
-            if (families.length != columns.length) {
-                LOG.warn("(IGNORE) Params, families & columns, doesn't have same length. (families.length : {}, columns.length : {})", families.length, columns.length);
+                scan.addColumn(column.toBytesFamily(), column.toBytesQualifier());
             }
             else {
-                for (int index = 0; index != families.length; ++index) {
-                    scan.addColumn(families[index], columns[index]);
-                }
+                HBaseColumnFamily family = HBaseColumnFamily.class.cast(familyOrColumn);
+
+                scan.addFamily(family.toBytesFamily());
             }
         }
+
+        if (Objects.nonNull(filter)) {  scan.setFilter(filter); }
 
         return scan;
     }
 
     /**
-     * retrieve all rows whose rowkey is within startRow and stopRow.
+     * retrieve row whose rowkey range between {@param startRow} and {@param stopRow}.
+     * if set {@param startRow} or {@param stopRow} or both set null, the parameter set null would be ignored.
+     * @see {@link #scan(Table , byte[], byte[], List, Filter) scan roww using Fiiter }
      *
      * @param table
      * @param startRow
      * @param stopRow
+     * @param familyOrColumns
+     * @param <T>
      * @return
      * @throws IOException
      */
-    protected List<Result> scan(Table table, byte[] startRow, byte[] stopRow, List<HBaseColumn> columns) throws IOException {
-        return scan(table, startRow, stopRow, columns, null);
-    }
-
-    /**
-     * retrieve all rows whose rowkey is within startRow and stopRow.
-     *
-     * @param table
-     * @param startRow
-     * @param stopRow
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    protected List<Result> scan(Table table, byte[] startRow, byte[] stopRow, List<HBaseColumn> columns, FilterList filterList) throws IOException {
-        ResultScanner scanner = table.getScanner(createScan(startRow, stopRow, columns, filterList));
+    public <T extends HBaseColumnFamily> List<Result> scan(Table table, byte[] startRow, byte[] stopRow, List<T> familyOrColumns, Filter filter) throws IOException {
+        ResultScanner scanner = table.getScanner(createScan(startRow, stopRow, familyOrColumns, filter));
         List<Result> results = new ArrayList<>();
 
         do {
@@ -702,24 +584,11 @@ public class HBaseBasicController {
 
         scanner.close();
 
-        //  dont' close table.
-
         return results;
     }
 
-    /**
-     * retrieve all rows whose rowkey is within startRow and stopRow.
-     *
-     * @param table
-     * @param startRow
-     * @param stopRow
-     * @param families
-     * @param columns
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(Table table, byte[] startRow, byte[] stopRow, byte[][] families, byte[][] columns, FilterList filterList) throws IOException {
-        ResultScanner scanner = table.getScanner(createScan(startRow, stopRow, families, columns, filterList));
+    public <T extends HBaseColumnFamily> List<Result> scan(Table table, byte[] startRow, List<T> familyOrColumns, Filter filter) throws IOException {
+        ResultScanner scanner = table.getScanner(createScan(startRow, null, familyOrColumns, filter));
         List<Result> results = new ArrayList<>();
 
         do {
@@ -734,222 +603,36 @@ public class HBaseBasicController {
 
         scanner.close();
 
-        //  dont' close table.
-
         return results;
     }
 
     /**
-     * scan table whose name is tablename.
+     * retrieve all rows.
+     * You can easily get {@param table first parameter} instance by calling {@link #getTable(String)} interface.
+     * if set {@param filter} null, it would be ignored.
      *
-     * @param tablename
-     * @param families
-     * @param columnes
+     * @param table
+     * @param familyOrColumns
+     * @param <T>
      * @return
      * @throws IOException
      */
-    public List<Result> scan(String tablename, byte[][] families, byte[][] columnes) throws IOException {
-        Table table = getTable(tablename);
+    public <T extends HBaseColumnFamily> List<Result> scan(Table table, List<T> familyOrColumns, Filter filter) throws IOException {
+        ResultScanner scanner = table.getScanner(createScan(null, null, familyOrColumns, filter));
+        List<Result> results = new ArrayList<>();
 
-        return scan(table, null, null, families, columnes, null);
+        do {
+            Result result = scanner.next();
+
+            if (Objects.isNull(result)) {
+                break;
+            }
+
+            results.add(result);
+        } while (true);
+
+        scanner.close();
+
+        return results;
     }
-
-    /**
-     * scan table whose name is tablename using filter(s)
-     *
-     * @param tablename
-     * @param families
-     * @param columnes
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[][] families, byte[][] columnes, FilterList filterList) throws IOException {
-        Table table = getTable(tablename);
-
-        return scan(table, null, null, families, columnes, filterList);
-    }
-
-    /**
-     * scan table whose name is tablename
-     * @param tablename
-     * @param startRow
-     * @param families
-     * @param columnes
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, byte[][] families, byte[][] columnes) throws IOException {
-        Table table = getTable(tablename);
-
-        return scan(table, startRow, null, families, columnes, null);
-    }
-
-    /**
-     * scan table whose name is tablename using filter(s)
-     *
-     * @param tablename
-     * @param startRow
-     * @param families
-     * @param columnes
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, byte[][] families, byte[][] columnes, FilterList filterList) throws IOException {
-        Table table = getTable(tablename);
-
-        return scan(table, startRow, null, families, columnes, filterList);
-    }
-
-    /**
-     * scan table whose name is tablename.
-     *
-     * @param tablename
-     * @param startRow
-     * @param stopRow
-     * @param families
-     * @param columnes
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, byte[] stopRow, byte[][] families, byte[][] columnes) throws IOException {
-        Table table = getTable(tablename);
-
-        return scan(table, startRow, stopRow, families, columnes, null);
-    }
-
-    /**
-     * scan table whose name is tablename using filter.
-     *
-     * @param tablename
-     * @param startRow
-     * @param stopRow
-     * @param families
-     * @param columnes
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, byte[] stopRow, byte[][] families, byte[][] columnes, FilterList filterList) throws IOException {
-        Table table = getTable(tablename);
-
-        return scan(table, startRow, stopRow, families, columnes, filterList);
-    }
-
-    /**
-     * scan table whose name is tablename.
-     *
-     * @param tablename
-     * @param column
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, HBaseColumn column) throws IOException {
-        return scan(tablename, Arrays.asList(column));
-    }
-
-    /**
-     * scan table whose name is tablename using filter(s)
-     *
-     * @param tablename
-     * @param column
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, HBaseColumn column, FilterList filterList) throws IOException {
-        return scan(tablename, Arrays.asList(column), filterList);
-    }
-
-    /**
-     * scan table whose name is tablename
-     *
-     * @param tablename
-     * @param columns
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, List<HBaseColumn> columns) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return scan(table, null, null, columns);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * scan table whose name is tablename using filter(s)
-     *
-     * @param tablename
-     * @param columns
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, List<HBaseColumn> columns, FilterList filterList) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return scan(table, null, null, columns, filterList);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * scan table whose name is tablename.
-     *
-     * @param tablename
-     * @param startRow
-     * @param columns
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, List<HBaseColumn> columns) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return scan(table, startRow, null, columns);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    /**
-     * scan table whose name is tablename using filter(s)
-     *
-     * @param tablename
-     * @param startRow
-     * @param columns
-     * @param filterList
-     * @return
-     * @throws IOException
-     */
-    public List<Result> scan(String tablename, byte[] startRow, List<HBaseColumn> columns, FilterList filterList) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return scan(table, startRow, null, columns, filterList);
-        }
-        finally {
-            table.close();
-        }
-    }
-
-    public List<Result> scan(String tablename, byte[] startRow, byte[] stopRow, List<HBaseColumn> columns) throws IOException {
-        Table table = getTable(tablename);
-
-        try {
-            return scan(table, startRow, stopRow, columns);
-        }
-        finally {
-            table.close();
-        }
-    }
-}
+ }
