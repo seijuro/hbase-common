@@ -182,7 +182,7 @@ public class HbaseBasicControllerTest {
                     didCreateTable = true;
                 }
 
-                Result result = controller.get(Sample.Tablename, new String(Sample.RowKey).getBytes());
+                Result result = controller.get(controller.getTable(Sample.Tablename), new String(Sample.RowKey).getBytes());
                 Assert.assertNotNull(result);
 
                 return;
@@ -280,7 +280,7 @@ public class HbaseBasicControllerTest {
 
                 //  get
                 {
-                    Result result = controller.get(Sample.Tablename, Sample.RowKey.getBytes());
+                    Result result = controller.get(controller.getTable(Sample.Tablename), Sample.RowKey.getBytes());
 
                     byte[] row = result.getRow();
                     Assert.assertNotNull(String.format("There must exists row for rowKey(%s). ", Sample.RowKey) , row);

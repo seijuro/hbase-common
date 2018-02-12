@@ -1,21 +1,16 @@
 package com.github.seijuro.hbase;
 
-import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.FilterList;
-import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.security.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.tools.jconsole.Tab;
 
 import java.io.IOException;
 import java.util.*;
@@ -491,7 +486,7 @@ public class HBaseBasicController {
 
         Get get = new Get(rowKey);
         get.setMaxVersions(maxVersion);
-        
+
         Result result = table.get(get);
 
         LOG.debug("result (rowkey : {}) : {}", rowKey, result);
@@ -556,9 +551,8 @@ public class HBaseBasicController {
     }
 
     /**
-     * retrieve row whose rowkey range between {@param startRow} and {@param stopRow}.
+     * scan row whose rowkey range between {@param startRow} and {@param stopRow} from {@param table}
      * if set {@param startRow} or {@param stopRow} or both set null, the parameter set null would be ignored.
-     * @see {@link #scan(Table , byte[], byte[], List, Filter) scan roww using Fiiter }
      *
      * @param table
      * @param startRow
@@ -587,6 +581,17 @@ public class HBaseBasicController {
         return results;
     }
 
+    /**
+     * scan {@param table} from the row whose rowkey is {@param startRow}.
+     *
+     * @param table
+     * @param startRow
+     * @param familyOrColumns
+     * @param filter
+     * @param <T>
+     * @return
+     * @throws IOException
+     */
     public <T extends HBaseColumnFamily> List<Result> scan(Table table, byte[] startRow, List<T> familyOrColumns, Filter filter) throws IOException {
         ResultScanner scanner = table.getScanner(createScan(startRow, null, familyOrColumns, filter));
         List<Result> results = new ArrayList<>();

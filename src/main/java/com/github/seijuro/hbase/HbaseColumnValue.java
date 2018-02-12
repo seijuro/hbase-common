@@ -1,6 +1,7 @@
 package com.github.seijuro.hbase;
 
 import lombok.Getter;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  * Created by myungjoonlee on 2017. 7. 13..
